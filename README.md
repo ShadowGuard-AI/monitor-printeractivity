@@ -1,3 +1,5 @@
+![Banner](banner.png)
+
 # monitor-printeractivity
 Monitors print jobs, including document names, user accounts, and printer destinations. Detects unauthorized printing of sensitive documents or unusual printing patterns. - Focused on System monitoring and alerts
 
