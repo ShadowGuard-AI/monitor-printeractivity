@@ -1,1 +1,3 @@
-psutil>=5.9.0
+# Linux: no third-party packages are required; print jobs are read with lpstat from CUPS.
+# Windows: pywin32 is required to read jobs from the print spooler.
+pywin32; sys_platform == "win32"
