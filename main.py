@@ -35,12 +35,21 @@ def get_print_jobs_windows():
     try:
         import win32print
         jobs = []
+        # Only the default printer is opened. Jobs sent to any other
+        # printer on the machine are never enumerated, however
+        # sensitive the document or however large the job, and the
+        # log gives no sign that the coverage is one queue deep.
         printer_name = win32print.GetDefaultPrinter()
         handle = win32print.OpenPrinter(printer_name)
         job_info = win32print.GetPrinter(handle, 2)  # Level 2 retrieves detailed job info
         jobs_available = job_info['cJobs']
 
         if jobs_available:
+            # EnumJobs sees the live queue. A job that prints and leaves
+            # the queue between my polls is never seen on this path,
+            # while the Linux path below asks lpstat for completed jobs
+            # and sees history. The same monitor therefore has a memory
+            # on one platform and none on the other.
             for job in win32print.EnumJobs(handle, 0, jobs_available, 2):
                 try:
                     jobs.append({
@@ -132,6 +141,11 @@ def analyze_print_job(job, sensitive_keywords, suspicious_user, max_pages):
     # Windows path provides; the Linux path has no document name to check.
     if document_name and any(keyword.lower() in document_name.lower() for keyword in sensitive_keywords):
         logging.warning(f"Sensitive document '{document_name}' printed by user '{user_name}' on printer '{job['printer_name']}'.")
+    # The user comparison is exact, case included, and the Linux
+    # job's user comes from splitting the lpstat line on
+    # whitespace, so it is whatever token sat in that column.
+    # A name written differently in the suspicious list, in
+    # case or in form, never matches.
     if user_name in suspicious_user:
         logging.warning(f"Suspicious user '{user_name}' printed '{job_label}' on printer '{job['printer_name']}'.")
     if total_pages is not None and total_pages > max_pages:
@@ -169,6 +183,12 @@ def main():
 
                 if print_jobs:
                     for job in print_jobs:
+                        # This set is the only thing standing between a job and a
+                        # repeat alert, and it grows for as long as the monitor
+                        # runs: nothing is ever pruned from it. A monitor left up
+                        # for months carries every job key it has ever seen in
+                        # memory, and a restarted monitor forgets them all and
+                        # re-alerts on whatever history the Linux path shows it.
                         job_key = (job.get("job_id"), job.get("submitted_time"))
                         if job_key in seen_jobs:
                             continue
